@@ -40,8 +40,26 @@ M.config = {
     -- -------------------------------------------------------------------------
 
     player = {
+        -- Logical provider.
+        --
+        -- YoutubeMusic / YoutubeMusic Pear-Desktop API:
+        --     YoutubeMusicProvider
+        --
+        -- Any other value:
+        --     playerctl -p <provider>
+        --
         provider = "YoutubeMusic",
+
+        -- playerctl executable.
         command = "playerctl",
+    },
+
+    -- -------------------------------------------------------------------------
+    -- YouTube Music
+    -- -------------------------------------------------------------------------
+
+    youtube_music = {
+        url = "http://localhost:26538",
     },
 
     -- -------------------------------------------------------------------------
@@ -49,6 +67,8 @@ M.config = {
     -- -------------------------------------------------------------------------
 
     cava = {
+        enabled = false,
+
         framerate = 30,
         bars = 16,
         input_method = "pulse",
@@ -184,15 +204,27 @@ local function get_command()
         -- Player
         -- ---------------------------------------------------------------------
 
-        "--player",
+        "--provider",
         M.config.player.provider,
 
         "--playerctl",
         M.config.player.command,
 
         -- ---------------------------------------------------------------------
+        -- YouTube Music
+        -- ---------------------------------------------------------------------
+
+        "--youtube-music-url",
+        M.config.youtube_music.url,
+
+        -- ---------------------------------------------------------------------
         -- CAVA
         -- ---------------------------------------------------------------------
+
+        "--cava",
+        M.config.cava.enabled
+        and "enabled"
+        or "disabled",
 
         "--cava-framerate",
         tostring(
@@ -434,10 +466,7 @@ function M.stop(callback)
         end
 
         -- ---------------------------------------------------------------------
-        -- Ask the backend to terminate through its process.
-        --
-        -- The backend does not currently expose /shutdown, so the process
-        -- reference is intentionally used here only when available.
+        -- Kill only the process managed by this instance.
         -- ---------------------------------------------------------------------
 
         if M.state.process then
@@ -484,13 +513,21 @@ local function request(method, path, body, callback)
     -- -------------------------------------------------------------------------
 
     if body ~= nil then
-        table.insert(command, "--header")
+        table.insert(
+            command,
+            "--header"
+        )
+
         table.insert(
             command,
             "Content-Type: application/json"
         )
 
-        table.insert(command, "--data")
+        table.insert(
+            command,
+            "--data"
+        )
+
         table.insert(
             command,
             vim.json.encode(body)
@@ -570,8 +607,15 @@ function M.get_state()
     return {
         running = M.state.running,
         starting = M.state.starting,
+
         host = M.config.host,
         port = M.config.port,
+
+        provider = M.config.player.provider,
+
+        cava = {
+            enabled = M.config.cava.enabled,
+        },
     }
 end
 
@@ -579,11 +623,30 @@ end
 -- CONFIGURATION
 -- =============================================================================
 
-function M.setup(options)
+function M.setup(
+    server_options,
+    cava_options
+)
+    -- -------------------------------------------------------------------------
+    -- Server configuration
+    -- -------------------------------------------------------------------------
+
     M.config = vim.tbl_deep_extend(
         "force",
         M.config,
-        options or {}
+        server_options or {}
+    )
+
+    -- -------------------------------------------------------------------------
+    -- CAVA configuration
+    --
+    -- CAVA lives outside opts.server, so merge it separately.
+    -- -------------------------------------------------------------------------
+
+    M.config.cava = vim.tbl_deep_extend(
+        "force",
+        M.config.cava,
+        cava_options or {}
     )
 
     return M

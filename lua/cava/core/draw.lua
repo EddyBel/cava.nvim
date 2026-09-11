@@ -557,81 +557,117 @@ end
 
 
 --- ============================================================================
----                              HORIZONTAL
+---                              HIGHLIGHTS
 --- ============================================================================
+--- Add a highlight instruction.
+---
+---@param highlights table
+---@param line number
+---@param start_col number
+---@param end_col number
+---@param highlight string|nil
+local function add_highlight(
+    highlights,
+    line,
+    start_col,
+    end_col,
+    highlight
+)
+    if not highlight then
+        return
+    end
+    if start_col >= end_col then
+        return
+    end
+    highlights[#highlights + 1] = {
+        line = line,
+        start_col = start_col,
+        end_col = end_col,
+        hl = highlight,
+    }
+end
 
+--- Run-length helper: acumula un highlight por celda y sólo lo "confirma"
+--- (agrega la instrucción real) cuando la celda siguiente tiene un color
+--- distinto o se acaba la línea. Esto colapsa N celdas contiguas del mismo
+--- color en una única llamada a `nvim_buf_add_highlight`, en vez de una
+--- por celda — crítico en modos "gradient"/"level" donde toda una fila (o
+--- gran parte de ella) comparte el mismo color.
+---
+---@return table run Estado del run: { line, start_col, col, highlight }
+local function new_highlight_run(line)
+    return { line = line, start_col = nil, col = 0, highlight = nil }
+end
+
+---@param run table
+---@param highlights table
+---@param byte_length number Ancho en bytes de la celda actual.
+---@param highlight string|nil
+local function push_cell(run, highlights, byte_length, highlight)
+    if highlight ~= run.highlight then
+        -- Cambió el color: cerramos el run anterior (si tenía color).
+        add_highlight(highlights, run.line, run.start_col, run.col, run.highlight)
+        run.highlight = highlight
+        run.start_col = run.col
+    end
+    run.col = run.col + byte_length
+end
+
+---@param run table
+---@param highlights table
+local function flush_run(run, highlights)
+    add_highlight(highlights, run.line, run.start_col, run.col, run.highlight)
+end
+
+-- ============================================================================
+--                              HORIZONTAL
+-- ============================================================================
 --- Draw a horizontal frame.
 ---
 --- Returns both the generated text and the instructions
---- required to color it.
+--- required to color it. Contiguous columns sharing the same highlight are
+--- merged into a single highlight instruction (run-length encoding).
 ---
 ---@param data table CAVA frame.
 ---@return table
 function DRAW.horizontal(data)
     data = normalize(data)
-
     local lines = {}
     local highlights = {}
-
     local line = {}
-    local byte_position = 0
-
-    local mode =
-        DRAW.config.colors.mode
-
+    local mode = DRAW.config.colors.mode
+    local run = new_highlight_run(0)
     for column, value in ipairs(data) do
-        local character =
-            get_level(value)
-
+        local character = get_level(value)
         line[#line + 1] = character
-
         local byte_length = #character
-
-        local highlight =
-            get_highlight(
-                mode,
-                column,
-                value
-            )
-
-        add_highlight(
-            highlights,
-            0,
-            byte_position,
-            byte_position + byte_length,
-            highlight
-        )
-
-        byte_position =
-            byte_position + byte_length
-
+        local highlight = get_highlight(mode, column, value)
+        push_cell(run, highlights, byte_length, highlight)
         if DRAW.config.separator ~= "" then
-            local separator =
-                DRAW.config.separator
-
+            local separator = DRAW.config.separator
             line[#line + 1] = separator
-
-            byte_position =
-                byte_position + #separator
+            -- El separador no lleva highlight: cierra cualquier run activo.
+            push_cell(run, highlights, #separator, nil)
         end
     end
-
+    flush_run(run, highlights)
     lines[1] = table.concat(line)
-
     return {
         lines = lines,
         highlights = highlights,
     }
 end
 
---- ============================================================================
----                              VERTICAL
---- ============================================================================
-
+-- ============================================================================
+--                              VERTICAL
+-- ============================================================================
 --- Draw a vertical frame.
 ---
---- Each filled cell receives a highlight according
---- to the configured color mode.
+--- Each filled cell receives a highlight according to the configured color
+--- mode. Contiguous cells sharing the same highlight within a row are
+--- merged into a single highlight instruction (run-length encoding) — en
+--- modos "gradient"/"level" toda una fila suele compartir un único color,
+--- así que esto reduce el número de llamadas de N (ancho) a 1 por fila.
 ---
 ---@param data table CAVA frame.
 ---@param height number Frame height.
@@ -639,14 +675,11 @@ end
 ---@return table
 function DRAW.vertical(data, height, opts)
     data = normalize(data)
-
     opts = opts or {}
-
     height = math.max(
         tonumber(height) or 1,
         1
     )
-
     if opts.width then
         data = scale_to_width(
             data,
@@ -663,77 +696,43 @@ function DRAW.vertical(data, height, opts)
             )
         )
     end
-
     local bars = {}
-
     for index, value in ipairs(data) do
         value = clamp(
             value,
             DRAW.config.min,
             DRAW.config.max
         )
-
         local normalized =
             normalize_value(value)
-
         bars[index] =
             math.floor(
                 normalized * height
             )
     end
-
     local lines = {}
     local highlights = {}
-
-    local mode =
-        DRAW.config.colors.mode
-
+    local mode = DRAW.config.colors.mode
     -- Draw from top to bottom.
     for row = height, 1, -1 do
         local line = {}
-
-        -- Byte position in the current line.
-        local byte_position = 0
-
+        local run = new_highlight_run(#lines)
         for column, bar_height in ipairs(bars) do
             local value = data[column]
-
             if bar_height >= row then
                 local character = "█"
-
                 line[#line + 1] = character
-
-                local highlight =
-                    get_highlight(
-                        mode,
-                        column,
-                        value,
-                        row,
-                        height
-                    )
-
-                add_highlight(
-                    highlights,
-                    #lines,
-                    byte_position,
-                    byte_position + #character,
-                    highlight
-                )
-
-                byte_position =
-                    byte_position + #character
+                local highlight = get_highlight(mode, column, value, row, height)
+                push_cell(run, highlights, #character, highlight)
             else
                 line[#line + 1] = " "
-
-                byte_position =
-                    byte_position + 1
+                -- Celda vacía: nunca lleva highlight, cierra el run activo.
+                push_cell(run, highlights, 1, nil)
             end
         end
-
-        lines[#lines + 1] =
-            table.concat(line)
+        flush_run(run, highlights)
+        lines[#lines + 1] = table.concat(line)
     end
-
     return {
         lines = lines,
         highlights = highlights,

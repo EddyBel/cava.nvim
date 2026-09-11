@@ -12,26 +12,58 @@ from http.server import HTTPServer
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
-from libs.cava import Cava
-from libs.playerctl import Playerctl
+from libs.music_orchestrator import MusicOrchestrator
 from libs.chafa import Chafa
+from libs.providers.playerctl import Playerctl
+from libs.providers.youtubemusic import YoutubeMusicProvider
 
 from endpoints.cava_routes import (
     get_frame,
     get_info as get_cava_info,
+    get_render_frame as get_cava_render_frame,
     get_status as get_cava_status,
 )
 
 from endpoints.playerctl_routes import (
+    auto_provider,
     get_artwork,
     get_info as get_player_info,
     get_metadata,
+    get_providers,
     get_status as get_player_status,
+    get_tracklist,
+    next_provider,
     next_track,
     pause,
     play,
     play_pause,
+    previous_provider,
     previous_track,
+    set_provider,
+
+    # Playback
+    stop_playback,
+    seek,
+    seek_forward,
+    seek_backward,
+    get_position,
+    set_position,
+
+    # Volume
+    get_volume,
+    set_volume,
+    volume_up,
+    volume_down,
+
+    # Shuffle
+    get_shuffle,
+    set_shuffle,
+    toggle_shuffle,
+
+    # Loop
+    get_loop_status,
+    set_loop_status,
+    toggle_loop,
 )
 
 from endpoints.image_routes import (
@@ -51,9 +83,6 @@ SERVER_NAME = "MusicManager"
 class ParentProcessMonitor:
     """
     Monitor a parent process and shutdown the server when it exits.
-
-    The monitored PID is intentionally stored instead of using os.getppid(),
-    because the server can be re-parented if the original parent dies.
     """
 
     def __init__(
@@ -69,14 +98,8 @@ class ParentProcessMonitor:
         self.running = False
         self.thread = None
 
-    # =========================================================================
-    # PROCESS
-    # =========================================================================
-
     def _process_exists(self):
-        """
-        Check whether the monitored process still exists.
-        """
+        """Check whether the monitored process still exists."""
 
         try:
             os.kill(
@@ -88,8 +111,6 @@ class ParentProcessMonitor:
             return False
 
         except PermissionError:
-            # The process exists, but we do not have permission
-            # to signal it.
             return True
 
         except OSError:
@@ -97,18 +118,13 @@ class ParentProcessMonitor:
 
         return True
 
-    # =========================================================================
-    # MONITOR
-    # =========================================================================
-
     def _monitor(self):
-        """
-        Monitor the parent process.
-        """
+        """Monitor the parent process."""
 
         while self.running:
 
             if not self._process_exists():
+
                 print(
                     "[MusicManager] "
                     f"Parent process {self.parent_pid} "
@@ -130,14 +146,8 @@ class ParentProcessMonitor:
                 self.interval
             )
 
-    # =========================================================================
-    # START
-    # =========================================================================
-
     def start(self):
-        """
-        Start the parent process monitor.
-        """
+        """Start the parent process monitor."""
 
         if self.running:
             return False
@@ -157,17 +167,10 @@ class ParentProcessMonitor:
 
         return True
 
-    # =========================================================================
-    # STOP
-    # =========================================================================
-
     def stop(self):
-        """
-        Stop the parent process monitor.
-        """
+        """Stop the parent process monitor."""
 
         self.running = False
-
         self.thread = None
 
 
@@ -179,8 +182,11 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
     """HTTP request handler for MusicManager."""
 
     cava = None
+    cava_enabled = False
+
     playerctl = None
     chafa = None
+    orchestrator = None
 
     # =========================================================================
     # RESPONSE
@@ -282,6 +288,7 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
         # ---------------------------------------------------------------------
 
         if path == "/":
+
             self._send_json(
                 200,
                 {
@@ -297,6 +304,19 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
         # ---------------------------------------------------------------------
 
         if path == "/cava":
+
+            if not self.cava_enabled:
+
+                self._send_json(
+                    200,
+                    {
+                        "enabled": False,
+                        "frame": None,
+                    },
+                )
+
+                return
+
             self._send_json(
                 200,
                 get_cava_info(
@@ -307,6 +327,18 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/cava/frame":
+
+            if not self.cava_enabled:
+
+                self._send_json(
+                    200,
+                    {
+                        "frame": None,
+                    },
+                )
+
+                return
+
             self._send_json(
                 200,
                 get_frame(
@@ -317,6 +349,20 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/cava/status":
+
+            if not self.cava_enabled:
+
+                self._send_json(
+                    200,
+                    {
+                        "enabled": False,
+                        "running": False,
+                        "available": False,
+                    },
+                )
+
+                return
+
             self._send_json(
                 200,
                 get_cava_status(
@@ -326,45 +372,216 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
 
             return
 
+        if path == "/cava/render":
+
+            try:
+
+                width = int(
+                    query.get(
+                        "width",
+                        [80],
+                    )[0]
+                )
+
+                height = int(
+                    query.get(
+                        "height",
+                        [20],
+                    )[0]
+                )
+
+                columns = int(
+                    query.get(
+                        "columns",
+                        [width],
+                    )[0]
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": (
+                            "width, height and columns "
+                            "must be integers"
+                        ),
+                    },
+                )
+
+                return
+
+            if (
+                width < 0
+                or height < 0
+                or columns < 0
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": (
+                            "width, height and columns "
+                            "must be greater than or equal to zero"
+                        ),
+                    },
+                )
+
+                return
+
+            if not self.cava_enabled:
+
+                self._send_json(
+                    200,
+                    {
+                        "frame": None,
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                get_cava_render_frame(
+                    self.cava,
+                    width=width,
+                    height=height,
+                    columns=columns,
+                ),
+            )
+
+            return
+
         # ---------------------------------------------------------------------
-        # Playerctl
+        # Player
         # ---------------------------------------------------------------------
 
         if path == "/player":
+
             self._send_json(
                 200,
                 get_player_info(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if path == "/player/metadata":
+
             self._send_json(
                 200,
                 get_metadata(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if path == "/player/status":
+
             self._send_json(
                 200,
                 get_player_status(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if path == "/player/artwork":
+
             self._send_json(
                 200,
                 get_artwork(
-                    self.playerctl
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        if path == "/player/providers":
+
+            self._send_json(
+                200,
+                get_providers(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        if path == "/player/tracklist":
+
+            self._send_json(
+                200,
+                get_tracklist(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Position
+        # ---------------------------------------------------------------------
+
+        if path == "/player/position":
+
+            self._send_json(
+                200,
+                get_position(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Volume
+        # ---------------------------------------------------------------------
+
+        if path == "/player/volume":
+
+            self._send_json(
+                200,
+                get_volume(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Shuffle
+        # ---------------------------------------------------------------------
+
+        if path == "/player/shuffle":
+
+            self._send_json(
+                200,
+                get_shuffle(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Loop
+        # ---------------------------------------------------------------------
+
+        if path == "/player/loop":
+
+            self._send_json(
+                200,
+                get_loop_status(
+                    self.orchestrator
                 ),
             )
 
@@ -382,19 +599,19 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             )[0]
 
             if not image_path:
+
                 self._send_json(
                     400,
                     {
                         "status": "BAD_REQUEST",
-                        "message": (
-                            "Missing image path"
-                        ),
+                        "message": "Missing image path",
                     },
                 )
 
                 return
 
             try:
+
                 result = get_image_info(
                     image_path
                 )
@@ -439,11 +656,8 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests."""
 
-        # ---------------------------------------------------------------------
-        # Read request body
-        # ---------------------------------------------------------------------
-
         try:
+
             data = self._read_json()
 
         except ValueError as error:
@@ -459,54 +673,543 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             return
 
         # ---------------------------------------------------------------------
-        # Playback controls
+        # Provider
+        # ---------------------------------------------------------------------
+
+        if self.path == "/player/provider":
+
+            provider = data.get(
+                "provider"
+            )
+
+            if not provider:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing provider",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                set_provider(
+                    self.orchestrator,
+                    provider,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/provider/auto":
+
+            self._send_json(
+                200,
+                auto_provider(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        if self.path == "/player/provider/next":
+
+            self._send_json(
+                200,
+                next_provider(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        if self.path == "/player/provider/previous":
+
+            self._send_json(
+                200,
+                previous_provider(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Playback
         # ---------------------------------------------------------------------
 
         if self.path == "/player/play":
+
             self._send_json(
                 200,
                 play(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if self.path == "/player/pause":
+
             self._send_json(
                 200,
                 pause(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if self.path == "/player/play-pause":
+
             self._send_json(
                 200,
                 play_pause(
-                    self.playerctl
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        if self.path == "/player/stop":
+
+            self._send_json(
+                200,
+                stop_playback(
+                    self.orchestrator
                 ),
             )
 
             return
 
         if self.path == "/player/next":
+
             self._send_json(
                 200,
                 next_track(
-                    self.playerctl
+                    self.orchestrator
                 ),
             )
 
             return
 
         if self.path == "/player/previous":
+
             self._send_json(
                 200,
                 previous_track(
-                    self.playerctl
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Seek
+        # ---------------------------------------------------------------------
+
+        if self.path == "/player/seek":
+
+            seconds = data.get(
+                "seconds"
+            )
+
+            if seconds is None:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing seconds",
+                    },
+                )
+
+                return
+
+            try:
+
+                seconds = float(
+                    seconds
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "seconds must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                seek(
+                    self.orchestrator,
+                    seconds,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/seek/forward":
+
+            seconds = data.get(
+                "seconds",
+                10,
+            )
+
+            try:
+
+                seconds = float(
+                    seconds
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "seconds must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                seek_forward(
+                    self.orchestrator,
+                    seconds,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/seek/backward":
+
+            seconds = data.get(
+                "seconds",
+                10,
+            )
+
+            try:
+
+                seconds = float(
+                    seconds
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "seconds must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                seek_backward(
+                    self.orchestrator,
+                    seconds,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/position":
+
+            position = data.get(
+                "position"
+            )
+
+            if position is None:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing position",
+                    },
+                )
+
+                return
+
+            try:
+
+                position = float(
+                    position
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "position must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                set_position(
+                    self.orchestrator,
+                    position,
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Volume
+        # ---------------------------------------------------------------------
+
+        if self.path == "/player/volume":
+
+            volume = data.get(
+                "volume"
+            )
+
+            if volume is None:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing volume",
+                    },
+                )
+
+                return
+
+            try:
+
+                volume = float(
+                    volume
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "volume must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                set_volume(
+                    self.orchestrator,
+                    volume,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/volume/up":
+
+            step = data.get(
+                "step",
+                0.05,
+            )
+
+            try:
+
+                step = float(
+                    step
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "step must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                volume_up(
+                    self.orchestrator,
+                    step,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/volume/down":
+
+            step = data.get(
+                "step",
+                0.05,
+            )
+
+            try:
+
+                step = float(
+                    step
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "step must be a number",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                volume_down(
+                    self.orchestrator,
+                    step,
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Shuffle
+        # ---------------------------------------------------------------------
+
+        if self.path == "/player/shuffle":
+
+            enabled = data.get(
+                "enabled"
+            )
+
+            if enabled is None:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing enabled",
+                    },
+                )
+
+                return
+
+            if not isinstance(
+                enabled,
+                bool,
+            ):
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "enabled must be a boolean",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                set_shuffle(
+                    self.orchestrator,
+                    enabled,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/shuffle/toggle":
+
+            self._send_json(
+                200,
+                toggle_shuffle(
+                    self.orchestrator
+                ),
+            )
+
+            return
+
+        # ---------------------------------------------------------------------
+        # Loop
+        # ---------------------------------------------------------------------
+
+        if self.path == "/player/loop":
+
+            status = data.get(
+                "status"
+            )
+
+            if not status:
+
+                self._send_json(
+                    400,
+                    {
+                        "status": "BAD_REQUEST",
+                        "message": "Missing loop status",
+                    },
+                )
+
+                return
+
+            self._send_json(
+                200,
+                set_loop_status(
+                    self.orchestrator,
+                    status,
+                ),
+            )
+
+            return
+
+        if self.path == "/player/loop/toggle":
+
+            self._send_json(
+                200,
+                toggle_loop(
+                    self.orchestrator
                 ),
             )
 
@@ -532,32 +1235,31 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             )
 
             if not image_path:
+
                 self._send_json(
                     400,
                     {
                         "status": "BAD_REQUEST",
-                        "message": (
-                            "Missing image path"
-                        ),
+                        "message": "Missing image path",
                     },
                 )
 
                 return
 
             if not size:
+
                 self._send_json(
                     400,
                     {
                         "status": "BAD_REQUEST",
-                        "message": (
-                            "Missing image size"
-                        ),
+                        "message": "Missing image size",
                     },
                 )
 
                 return
 
             try:
+
                 result = get_image_size(
                     image_path,
                     size,
@@ -605,32 +1307,31 @@ class MusicManagerHandler(BaseHTTPRequestHandler):
             )
 
             if not image_path:
+
                 self._send_json(
                     400,
                     {
                         "status": "BAD_REQUEST",
-                        "message": (
-                            "Missing image path"
-                        ),
+                        "message": "Missing image path",
                     },
                 )
 
                 return
 
             if not size:
+
                 self._send_json(
                     400,
                     {
                         "status": "BAD_REQUEST",
-                        "message": (
-                            "Missing image size"
-                        ),
+                        "message": "Missing image size",
                     },
                 )
 
                 return
 
             try:
+
                 result = render_image(
                     image_path,
                     size,
@@ -739,6 +1440,19 @@ def parse_args():
     # =========================================================================
 
     parser.add_argument(
+        "--cava",
+        choices=(
+            "enabled",
+            "disabled",
+        ),
+        default="enabled",
+        help=(
+            "Enable or disable CAVA "
+            "(default: enabled)"
+        ),
+    )
+
+    parser.add_argument(
         "--cava-framerate",
         type=int,
         default=30,
@@ -765,14 +1479,20 @@ def parse_args():
     )
 
     # =========================================================================
-    # PLAYERCTL
+    # PLAYER
     # =========================================================================
 
     parser.add_argument(
+        "--provider",
         "--player",
+        dest="provider",
         default="YoutubeMusic",
         help=(
-            "MPRIS player provider "
+            "Logical music provider. "
+            "YoutubeMusic/YoutubeMusic Pear-Desktop API "
+            "uses the YouTube Music provider. "
+            "Any other value is used as the playerctl provider "
+            "(for example: firefox, spotify, chromium). "
             "(default: YoutubeMusic)"
         ),
     )
@@ -783,6 +1503,19 @@ def parse_args():
         help=(
             "playerctl executable "
             "(default: playerctl)"
+        ),
+    )
+
+    # =========================================================================
+    # YOUTUBE MUSIC
+    # =========================================================================
+
+    parser.add_argument(
+        "--youtube-music-url",
+        default="http://localhost:26538",
+        help=(
+            "YouTube Music / Pear Desktop API URL "
+            "(default: http://localhost:26538)"
         ),
     )
 
@@ -801,32 +1534,63 @@ def main():
     # =========================================================================
     # CAVA
     # =========================================================================
+    #
+    # CAVA se importa e instancia solamente cuando está habilitado.
+    #
+    # Esto es importante porque la creación de Cava() puede iniciar
+    # recursos/procesos en segundo plano.
+    #
+    # =========================================================================
 
-    cava = Cava({
-        "framerate": args.cava_framerate,
-        "bars": args.cava_bars,
+    cava = None
 
-        "input_method": args.cava_input_method,
-        "input_source": args.cava_input_source,
-    })
+    cava_enabled = (
+        args.cava == "enabled"
+    )
 
-    if not cava.start():
-        raise RuntimeError(
-            "Unable to start CAVA"
-        )
+    if cava_enabled:
+
+        from libs.cava import Cava
+
+        cava = Cava({
+            "framerate": args.cava_framerate,
+            "bars": args.cava_bars,
+            "input_method": args.cava_input_method,
+            "input_source": args.cava_input_source,
+        })
+
+        if not cava.start():
+
+            raise RuntimeError(
+                "Unable to start CAVA"
+            )
 
     # =========================================================================
     # PLAYERCTL
     # =========================================================================
 
     playerctl = Playerctl({
-        "provider": args.player,
+        "provider": args.provider,
         "command": args.playerctl,
     })
 
+    # =========================================================================
+    # YOUTUBE MUSIC
+    # =========================================================================
+
+    youtubemusic = YoutubeMusicProvider({
+        "provider": "YoutubeMusic",
+        "base_url": args.youtube_music_url,
+    })
+
+    # =========================================================================
+    # PLAYERCTL START
+    # =========================================================================
+
     if not playerctl.start():
 
-        cava.stop()
+        if cava_enabled and cava is not None:
+            cava.stop()
 
         raise RuntimeError(
             "Unable to start Playerctl"
@@ -839,12 +1603,42 @@ def main():
     chafa = Chafa()
 
     # =========================================================================
+    # MUSIC ORCHESTRATOR
+    # =========================================================================
+    #
+    # El provider recibido por --provider / --player es la fuente de verdad.
+    #
+    # Ejemplos:
+    #
+    #   --provider YoutubeMusic
+    #       -> YoutubeMusicProvider
+    #
+    #   --provider "YoutubeMusic Pear-Desktop API"
+    #       -> YoutubeMusicProvider
+    #
+    #   --provider firefox
+    #       -> playerctl -p firefox
+    #
+    #   --provider spotify
+    #       -> playerctl -p spotify
+    #
+    # =========================================================================
+
+    orchestrator = MusicOrchestrator(
+        yt_provider=youtubemusic,
+        playerctl_provider=playerctl,
+        provider_name=args.provider,
+    )
+
+    # =========================================================================
     # HANDLER STATE
     # =========================================================================
 
     MusicManagerHandler.cava = cava
+    MusicManagerHandler.cava_enabled = cava_enabled
     MusicManagerHandler.playerctl = playerctl
     MusicManagerHandler.chafa = chafa
+    MusicManagerHandler.orchestrator = orchestrator
 
     # =========================================================================
     # HTTP SERVER
@@ -867,8 +1661,11 @@ def main():
     if args.parent_pid is not None:
 
         if args.parent_pid <= 0:
+
             playerctl.stop()
-            cava.stop()
+
+            if cava_enabled and cava is not None:
+                cava.stop()
 
             raise ValueError(
                 "Parent PID must be greater than zero"
@@ -891,6 +1688,7 @@ def main():
         )
 
     else:
+
         print(
             "Parent monitoring: disabled"
         )
@@ -904,13 +1702,30 @@ def main():
         f"http://{args.host}:{args.port}"
     )
 
+    if cava_enabled:
+
+        print(
+            f"CAVA: enabled "
+            f"({args.cava_bars} bars @ "
+            f"{args.cava_framerate} FPS)"
+        )
+
+    else:
+
+        print(
+            "CAVA: disabled"
+        )
+
     print(
-        f"CAVA: {args.cava_bars} bars @ "
-        f"{args.cava_framerate} FPS"
+        f"Provider: {args.provider}"
     )
 
     print(
-        f"Player: {args.player}"
+        f"playerctl: {args.playerctl}"
+    )
+
+    print(
+        f"YouTube Music API: {args.youtube_music_url}"
     )
 
     print(
@@ -922,6 +1737,7 @@ def main():
     # =========================================================================
 
     try:
+
         server.serve_forever()
 
     except KeyboardInterrupt:
@@ -936,7 +1752,9 @@ def main():
             parent_monitor.stop()
 
         playerctl.stop()
-        cava.stop()
+
+        if cava_enabled and cava is not None:
+            cava.stop()
 
         server.server_close()
 

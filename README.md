@@ -10,16 +10,19 @@
  <img alt="banner_05" src="https://img.shields.io/github/languages/code-size/EddyBel/cava.nvim?color=%23F1948A&style=for-the-badge" />
 </p>
 
-A Neovim plugin that brings music playback information, album artwork, playback controls, and a real-time CAVA audio visualizer directly into your editor.
+`cava.nvim` is a music player interface and audio visualizer for Neovim.
 
-> **Early development**
->
-> `cava.nvim` is currently in its first version. The plugin is functional, but it is still being actively developed and polished. Some parts of the architecture, rendering system, and user interface may change as the project evolves.
+It provides music information, playback controls, album artwork, tracklists, track thumbnails, and an optional real-time CAVA visualizer directly inside Neovim.
 
-<img src="./assets/preview_1.png" alt="Preview 1" width="100%">
-<img src="./assets/preview_2.png" alt="Preview 2" width="100%">
-<img src="./assets/preview_3.png" alt="Preview 3" width="100%">
-<img src="./assets/preview_4.png" alt="Preview 4" width="100%">
+The plugin uses a Python backend to communicate with external media services and system utilities while Neovim handles the user interface.
+
+<img src="./assets/preview_6.png" alt="Preview 1" width="100%">
+<img src="./assets/preview_7.png" alt="Preview 2" width="100%">
+<img src="./assets/preview_8.png" alt="Preview 3" width="100%">
+<img src="./assets/preview_9.png" alt="Preview 4" width="100%">
+<img src="./assets/preview_10.png" alt="Preview 4" width="100%">
+<img src="./assets/preview_11.png" alt="Preview 4" width="100%">
+<img src="./assets/preview_12.png" alt="Preview 4" width="100%">
 <img src="./assets/preview_5.gif" alt="Preview 5" width="100%">
 
 ## Purpose
@@ -28,80 +31,184 @@ The idea behind **cava.nvim** started from a simple question:
 
 > Why should I leave Neovim just to check or control my music?
 
-The goal of the project is to provide a small music interface directly inside Neovim, allowing you to see what is currently playing, control playback, view album artwork, and enjoy an audio visualizer without switching to another application.
+The goal is to provide a small and extensible music interface directly inside Neovim.
 
-The plugin communicates with external tools such as **Playerctl**, **CAVA**, **Python**, and **Chafa**, while Neovim provides the user interface.
+Instead of switching between the editor and a separate music application, `cava.nvim` allows you to:
 
-The architecture is intentionally separated into independent components so that each subsystem can evolve independently.
+- See what is currently playing.
+- Control playback.
+- View album artwork.
+- Browse the current tracklist.
+- Display track thumbnails.
+- Control volume, shuffle, and repeat modes.
+- View playback progress.
+- Display a real-time audio visualizer.
+
+The architecture separates the Neovim interface from the Python backend and media providers, allowing each component to evolve independently.
 
 ## Features
 
-### Current Features
+### Music
 
 - [x] **Music information** — Displays the current track, artist, album, playback state, position, and duration.
-- [x] **Playback controls** — Play, pause, toggle playback, next track, and previous track.
-- [x] **Playerctl integration** — Uses MPRIS through Playerctl to communicate with compatible media players.
-- [x] **Real-time CAVA visualizer** — Displays audio frequency bars directly inside Neovim.
-- [x] **Album artwork** — Retrieves artwork URLs from the media player and downloads the images asynchronously.
+- [x] **Playback controls** — Play, pause, toggle playback, stop, next track, and previous track.
+- [x] **Seek controls** — Seek relative to the current position and set an exact playback position.
+- [x] **Volume controls** — Set, increase, and decrease playback volume.
+- [x] **Shuffle control** — Enable, disable, and toggle shuffle.
+- [x] **Loop control** — Disable repeat, repeat the current track, or repeat the playlist.
+- [x] **Music provider selection** — Select, automatically detect, and cycle between music providers.
+
+### Tracklist
+
+- [x] **Tracklist support** — Retrieves the current playlist/queue when the selected music source provides it.
+- [x] **Tracklist navigation** — Displays the current and upcoming tracks.
+- [x] **Track thumbnails** — Retrieves and displays individual track artwork when available.
+- [x] **Configurable tracklist artwork** — Tracklist thumbnails can be enabled or disabled independently from the main artwork.
+- [x] **Artwork source selection** — Tracklist thumbnails can use rendered artwork or a generic placeholder.
+- [x] **Upcoming tracklist mode** — Optionally hides already played tracks.
+- [x] **Tracklist placeholders** — Displays a configurable placeholder while playlist information is unavailable.
+
+### Artwork
+
+- [x] **Album artwork** — Retrieves artwork from supported media sources.
+- [x] **Asynchronous artwork loading** — Artwork is downloaded without blocking Neovim.
 - [x] **Artwork caching** — Avoids downloading the same artwork repeatedly.
-- [x] **Terminal artwork rendering** — Uses Chafa to convert album artwork into terminal-compatible ANSI output.
-- [x] **Asynchronous backend** — The Python server runs independently from Neovim's main UI loop.
-- [x] **Configurable player source** — Playerctl can be configured to use the MPRIS player you need.
-- [x] **Configurable UI** — Music labels, controls, progress bars, artwork dimensions, window behavior, and other visual elements can be customized.
-- [x] **Automatic server lifecycle** — The backend server can be started and monitored automatically by the plugin.
+- [x] **Terminal artwork rendering** — Uses Chafa to convert images into terminal-compatible output.
+- [x] **Configurable artwork dimensions** — Artwork size can be adjusted independently of the music panel.
 
-### Tested Setup
+### Audio Visualization
 
-The first version of the plugin was specifically tested with **YouTube Music running through [Pear Desktop](https://github.com/pear-devs/pear-desktop)**.
+- [x] **Real-time CAVA visualizer** — Displays audio frequency bars directly inside Neovim.
+- [x] **Configurable CAVA rendering** — FPS, number of bars, height, and update behavior can be configured.
+- [x] **Optional CAVA support** — The visualizer can be completely disabled if CAVA is not installed or not required.
 
-Pear Desktop is **not required** by `cava.nvim`.
+### Backend
 
-The important requirement is that the music player exposes an MPRIS interface that can be accessed through Playerctl.
+- [x] **Python backend** — Runs media and visualization operations outside Neovim's main UI loop.
+- [x] **HTTP communication** — Neovim communicates with the backend through a local HTTP API.
+- [x] **Automatic server lifecycle** — The backend can be started, monitored, and stopped automatically.
+- [x] **Provider abstraction** — Media sources are isolated from the Neovim interface.
+- [x] **Asynchronous operations** — Network, artwork, and backend operations do not intentionally block the Neovim UI.
 
-This means that other compatible players can potentially be used by changing the `playerctl.provider` option.
+## Media Sources
 
-For example:
+`cava.nvim` currently provides two main ways of communicating with media players.
+
+### Pear Desktop
+
+Native support is available for **Pear Desktop**, an application that provides YouTube Music functionality on the desktop.
+
+Original project:
+
+[Pear Desktop — GitHub](https://github.com/pear-devs/pear-desktop?utm_source=chatgpt.com)
+
+This integration communicates directly with Pear Desktop's API instead of relying exclusively on Playerctl.
+
+This allows `cava.nvim` to obtain richer information from the application, including information that may not be available through a generic MPRIS interface.
+
+#### Enabling the Pear Desktop API
+
+To use the native Pear Desktop integration:
+
+1. Open **Pear Desktop**.
+2. Open the application's **Plugins** section.
+3. Locate **Servidor API**.
+4. Enable **Servidor API**.
+5. Make sure the API server is running.
+6. Configure `cava.nvim` to use the YouTube Music provider.
+
+Example:
 
 ```lua
-playerctl = {
-    provider = "YoutubeMusic",
-    command = "playerctl",
+server = {
+    player = {
+        provider = "YoutubeMusic",
+    },
+
+    youtube_music = {
+        url = "http://localhost:26538",
+    },
 }
 ```
 
-You can find the available Playerctl players with:
+The API URL must match the address configured by Pear Desktop.
+
+When the YouTube Music provider is selected, `cava.nvim` first attempts to use the native Pear Desktop API.
+
+If the native backend is unavailable, the music system can fall back to the generic Playerctl backend when applicable.
+
+Pear Desktop is **not required** to use `cava.nvim`.
+
+### Playerctl
+
+**Playerctl** is supported as the generic media source.
+
+Playerctl communicates with media players through the **MPRIS** interface available on Linux.
+
+This makes it possible to use `cava.nvim` with many different media players without implementing a dedicated integration for each one.
+
+Examples include media players and applications that expose MPRIS metadata and controls through Playerctl.
+
+List the available players with:
 
 ```bash
 playerctl -l
 ```
 
-Then use the corresponding player name in your configuration.
+A specific provider can then be selected:
+
+```lua
+server = {
+    player = {
+        provider = "firefox",
+        command = "playerctl",
+    },
+}
+```
+
+The resulting Playerctl command uses the selected provider:
+
+```bash
+playerctl -p firefox
+```
+
+For YouTube Music/Pear Desktop, the special provider names are handled by the native YouTube Music backend.
 
 ## Requirements
 
-The plugin relies on several external programs.
-
 ### Neovim
 
-A recent version of Neovim is recommended.
+`cava.nvim` requires:
 
-The plugin uses Neovim's Lua APIs, asynchronous callbacks, timers, buffers, windows, and HTTP communication with the backend.
+**Neovim 0.12 or newer.**
+
+The plugin uses modern Neovim Lua APIs, asynchronous operations, timers, buffers, windows, namespaces, and rendering functionality.
+
+Using the latest stable Neovim version is recommended.
+
+Check your version with:
+
+```bash
+nvim --version
+```
 
 ### Python
 
 **Python 3** is required for the backend server.
 
-The Python backend is responsible for functionality that is easier to isolate outside Neovim, including:
+The Python backend is responsible for:
 
-- CAVA process management.
-- Playerctl metadata monitoring.
-- Artwork downloading and caching.
+- Media provider communication.
+- HTTP API communication.
+- Artwork downloading.
+- Artwork caching.
 - Image inspection.
-- Image size calculations.
+- Image dimensions.
 - Chafa rendering.
-- HTTP API communication with Neovim.
+- CAVA process management.
+- Playerctl integration.
 
-Check your Python installation with:
+Check your installation:
 
 ```bash
 python3 --version
@@ -115,81 +222,73 @@ server = {
 }
 ```
 
-### CAVA
-
-**CAVA** is the audio visualizer used by the plugin.
-
-It analyzes the system's audio input and produces the frequency data used to draw the visualizer inside Neovim.
-
-Check your installation with:
-
-```bash
-cava -v
-```
-
-The plugin currently uses CAVA's raw output mode to receive numerical audio frames.
-
-CAVA's input configuration can be customized:
-
-```lua
-cava = {
-    framerate = 60,
-    bars = 24,
-    input_method = "pulse",
-    input_source = "auto",
-}
-```
-
-### Playerctl
-
-**Playerctl** is used to communicate with media players through the **MPRIS** interface.
-
-It provides:
-
-- Current track metadata.
-- Playback status.
-- Track position.
-- Track duration.
-- Album artwork URL.
-- Play/pause controls.
-- Previous/next track controls.
-
-Check your installation with:
-
-```bash
-playerctl --version
-```
-
-List available media players with:
-
-```bash
-playerctl -l
-```
-
-Then configure the desired player:
-
-```lua
-playerctl = {
-    provider = "YoutubeMusic",
-    command = "playerctl",
-}
-```
-
-The `provider` value depends on the media player available on your system.
-
 ### Chafa
 
-**Chafa** is used to render album artwork inside terminals that do not provide native image rendering.
+**Chafa is required for artwork rendering.**
 
-It converts regular image files into terminal-compatible ANSI/symbol output.
+Chafa is used to convert album artwork and track thumbnails into terminal-compatible ASCII/Unicode representations.
 
-Check your installation with:
+This allows artwork to be displayed inside Neovim without requiring native terminal image protocols.
+
+Check your installation:
 
 ```bash
 chafa --version
 ```
 
-`cava.nvim` uses Chafa for terminal artwork rendering while taking the terminal's font aspect ratio into account.
+### Playerctl
+
+**Playerctl is optional but recommended as a generic media source.**
+
+It provides a universal interface for media players that expose an MPRIS interface.
+
+It is especially useful when using a media player that does not have a dedicated native provider in `cava.nvim`.
+
+Check your installation:
+
+```bash
+playerctl --version
+```
+
+List available players:
+
+```bash
+playerctl -l
+```
+
+`cava.nvim` does not require Playerctl when using a native provider that communicates directly with its application API.
+
+### CAVA
+
+**CAVA is completely optional.**
+
+CAVA is only required when the audio visualizer is enabled.
+
+If you do not need the visualizer, CAVA can be disabled in the Neovim configuration and does not need to be installed.
+
+Enable the visualizer:
+
+```lua
+cava = {
+    enabled = true,
+}
+```
+
+Disable it:
+
+```lua
+cava = {
+    enabled = false,
+}
+```
+
+When CAVA is enabled, the `cava` executable must be available in the system.
+
+Check the installation:
+
+```bash
+cava -v
+```
 
 ## Installation
 
@@ -198,7 +297,6 @@ chafa --version
 ```lua
 {
     "EddyBel/cava.nvim",
-
     opts = {},
 }
 ```
@@ -215,7 +313,7 @@ use {
 }
 ```
 
-### Native Packages (`vim.packadd`)
+### Native Packages (`vim.pack`)
 
 ```lua
 vim.pack.add({
@@ -223,7 +321,7 @@ vim.pack.add({
 })
 ```
 
-Then add the following to your `init.lua`:
+Then initialize the plugin:
 
 ```lua
 require("cava").setup()
@@ -231,121 +329,100 @@ require("cava").setup()
 
 ## Configuration
 
-`cava.nvim` is designed so that each subsystem owns its own default configuration.
+`cava.nvim` uses a modular configuration.
 
-This means you only need to override the options you want to change.
+Each subsystem has its own configuration section:
 
-A complete configuration example is shown below:
+```text
+opts
+├── server
+├── menu
+├── player
+├── cava
+└── poller
+```
+
+A complete configuration example:
 
 ```lua
 {
     "EddyBel/cava.nvim",
-
     opts = {
-        -- ============================================================
-        -- SERVER
-        -- ============================================================
-
         server = {
             host = "127.0.0.1",
             port = 9092,
             python = "python3",
-
-            startup_timeout = 5,
-            check_interval = 100,
-            parent_check_interval = 1.0,
-
             player = {
+                -- Logical provider.
+                --
+                -- YoutubeMusic / YoutubeMusic Pear-Desktop API:
+                --     YoutubeMusicProvider
+                --
+                -- Any other value:
+                --     playerctl -p <provider>
+                --
                 provider = "YoutubeMusic",
+                -- playerctl executable.
                 command = "playerctl",
             },
-
-            cava = {
-                framerate = 60,
-                bars = 24,
-                input_method = "pulse",
-                input_source = "auto",
+            youtube_music = {
+                -- Youtube Music Pear-Desktop URI API
+                url = "http://localhost:26538",
             },
         },
-
-        -- ============================================================
-        -- PLAYERCTL
-        -- ============================================================
-
-        playerctl = {
-            provider = "YoutubeMusic",
-            command = "playerctl",
-
-            interval = 500,
-        },
-
-        -- ============================================================
-        -- CAVA
-        -- ============================================================
-
-        cava = {
-            framerate = 60,
-            bars = 24,
-
-            input_method = "pulse",
-            input_source = "auto",
-
-            interval = 33,
-        },
-
-        -- ============================================================
-        -- ARTWORK
-        -- ============================================================
-
-        artwork = {
-            enabled = true,
-
-            placeholder = "@",
-
-            font_ratio = "1/2",
-
-            max_width = 28,
-            max_height = 18,
-
-            highlight = "CavaArtwork",
-        },
-
-        -- ============================================================
-        -- BUFFER
-        -- ============================================================
-
-        buffer = {
-            manager_name = "Music Manager",
-
+        menu = {
             max_width = 40,
             min_width = 20,
-            width = 35,
+            width = 30,
+            resize = true,
+            persistent = true,
+        },
+        player = {
+            name = "Music Manager",
+            buftype = "nofile",
+            bufhidden = "hide",
+            swapfile = false,
 
-            manager = {
-                buftype = "nofile",
-                bufhidden = "hide",
-                swapfile = false,
+            background = {
+                --- Si es `false`, la ventana usa el fondo normal del editor.
+                enabled = true,
+                --- Cuánto oscurecer el fondo respecto a "Normal": 0 = igual,
+                --- 1 = negro absoluto. 0.15 es un valor sutil, similar a lo que
+                --- usan plugins como neo-tree.
+                darken = 0.15,
+                --- Nombre del highlight group generado internamente.
+                highlight_group = "CavaPlayerNormal",
             },
 
-            cava_name = "CAVA",
-
-            cava = {
-                buftype = "nofile",
-                bufhidden = "wipe",
-                swapfile = false,
-
-                max_height = 15,
+            window = {
+                wrap = false,
+                number = false,
+                relativenumber = false,
+                cursorline = false,
+                cursorcolumn = false,
+                signcolumn = "no",
+                colorcolumn = "",
             },
 
             music = {
                 title = "NOW PLAYING",
 
-                empty_title = "No music playing",
-                empty_artist = "Unknown artist",
-                empty_album = "Unknown album",
+                title_style = {
+                    enabled = true,
+                    left = '',
+                    right = '',
+                    padding = 1,
+                    highlight_group = "CavaPlayerTitle",
+                    foreground = nil,
+                    background = "Visual",
+                },
 
-                padding = 2,
-                spacing = 2,
+                empty_title = "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀",
+                empty_artist = "▀▀▀▀▀▀▀▀▀▀",
+                empty_album = "▀▀▀▀▀▀",
+
+                padding = 1,
+                spacing = 1,
 
                 controls = {
                     previous = "󰒮",
@@ -361,266 +438,795 @@ A complete configuration example is shown below:
                 },
 
                 progress = {
-                    filled = "█",
-                    empty = "░",
-                    left = "[",
-                    right = "]",
+                    filled = "●",
+                    empty = "·",
+                    left = "",
+                    right = "",
                 },
-
                 artwork = {
                     enabled = true,
-
-                    placeholder = "@",
-
+                    placeholder = "█",
                     highlight = "CavaArtwork",
 
                     max_width = 28,
-                    max_height = 18,
+                    max_height = 13,
+                },
+
+                tracklist = {
+                    enabled = true,
+                    view_mode = "upcoming",
+
+                    spacing = 1,
+                    item_spacing = 1,
+
+                    thumbnail_width = 6,
+                    thumbnail_height = 3,
+                    thumbnail_gap = 2,
+
+                    duration_gap = 2,
+
+                    placeholder = "▀▀",
+
+                    selected = "▶",
+
+                    selected_highlight = "Title",
+                    title_highlight = "Normal",
+                    metadata_highlight = "Comment",
+                    duration_highlight = "Comment",
+
+                    artwork = {
+                        enabled = true,
+                        source = "image",
+                    },
+
+                    empty_placeholder = {
+                        enabled = true,
+                        items = 7,
+                        title = "No tracklist available",
+                        artist = "Waiting for playlist data...",
+                        fake_title = "▀▀▀▀▀▀",
+                        fake_metadata = "▀▀▀▀▀▀▀▀▀▀▀▀",
+                        fake_duration = "--:--"
+                    },
                 },
             },
-
-            wrap = false,
-            number = false,
-            relativenumber = false,
-
-            cursorline = false,
-            cursorcolumn = false,
-
-            signcolumn = "no",
-            colorcolumn = "",
-
-            resize = true,
-            persistent = true,
         },
+
+        cava = {
+            enabled = false,
+            background = {
+                enabled = true,
+                darken = 0.15,
+                highlight_group = "CavaPlayerNormal",
+            },
+
+            fps = 30,
+            delay_ms = 90,
+
+            max_inflight = 3,
+            min_request_interval = 0,
+            max_buffered_frames = 12,
+
+            debug = false,
+            max_height = 12,
+        },
+
+        poller = {
+            player_interval = 1000,
+            retry_interval = 100,
+        },
+
+        artwork = {
+            enabled = true,
+        },
+
+        tracklist_artwork = {
+            enabled = true,
+        },
+    }
+},
+```
+
+## Configuration
+
+`cava.nvim` can be configured through the `opts` table passed to `setup()`.
+
+```lua
+require("cava").setup({
+    -- configuration
+})
+```
+
+The configuration is divided into several sections, each responsible for a specific part of the plugin.
+
+---
+
+### Server
+
+Controls the local Python HTTP server and the media backends used by `cava.nvim`.
+
+| Option                     | Values    | Description                                                                                                                                                               |
+| :------------------------- | :-------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server.host`              | `string`  | Host address where the Python server listens.                                                                                                                             |
+| `server.port`              | `integer` | Port used by the Python HTTP server.                                                                                                                                      |
+| `server.python`            | `string`  | Python executable used to start the backend.                                                                                                                              |
+| `server.player.provider`   | `string`  | Logical media provider to use. `YoutubeMusic` / `YoutubeMusic Pear-Desktop API` use the YouTube Music backend; any other value is passed to Playerctl as `-p <provider>`. |
+| `server.player.command`    | `string`  | Playerctl executable or command used by the generic media backend.                                                                                                        |
+| `server.youtube_music.url` | `string`  | URL of the YouTube Music Pear Desktop API server.                                                                                                                         |
+
+#### Provider Values
+
+The `server.player.provider` option determines which media backend is used.
+
+| Value                             | Backend       | Description                                                  |
+| :-------------------------------- | :------------ | :----------------------------------------------------------- |
+| `"YoutubeMusic"`                  | YouTube Music | Uses the YouTube Music backend.                              |
+| `"YoutubeMusic Pear-Desktop API"` | YouTube Music | Uses the Pear Desktop API.                                   |
+| `<player>`                        | Playerctl     | Uses `playerctl -p <player>` for an MPRIS-compatible player. |
+
+For example:
+
+```lua
+server = {
+    player = {
+        provider = "firefox",
+        command = "playerctl",
     },
 }
 ```
 
-### Configuration Options
+This makes the backend use:
 
-| Option                         | Type      | Description                                               |
-| ------------------------------ | --------- | --------------------------------------------------------- |
-| `server.host`                  | `string`  | Address where the Python backend listens.                 |
-| `server.port`                  | `number`  | TCP port used by the backend.                             |
-| `server.python`                | `string`  | Python executable used to start the backend.              |
-| `server.startup_timeout`       | `number`  | Maximum time in seconds allowed for the backend to start. |
-| `server.check_interval`        | `number`  | Server availability check interval in milliseconds.       |
-| `server.parent_check_interval` | `number`  | Backend parent-process check interval in seconds.         |
-| `playerctl.provider`           | `string`  | MPRIS player controlled by the plugin.                    |
-| `playerctl.command`            | `string`  | Playerctl executable.                                     |
-| `playerctl.interval`           | `number`  | Metadata update interval in milliseconds.                 |
-| `cava.framerate`               | `number`  | Number of audio frames generated per second.              |
-| `cava.bars`                    | `number`  | Number of visualizer bars.                                |
-| `cava.input_method`            | `string`  | Audio input backend used by CAVA.                         |
-| `cava.input_source`            | `string`  | Audio source passed to CAVA.                              |
-| `cava.interval`                | `number`  | Interval in milliseconds for requesting new CAVA frames.  |
-| `artwork.enabled`              | `boolean` | Enables or disables artwork rendering.                    |
-| `artwork.placeholder`          | `string`  | Character displayed while artwork is unavailable.         |
-| `artwork.font_ratio`           | `string`  | Terminal font aspect ratio used for image sizing.         |
-| `artwork.max_width`            | `number`  | Maximum artwork width in terminal cells.                  |
-| `artwork.max_height`           | `number`  | Maximum artwork height in terminal cells.                 |
-| `artwork.highlight`            | `string`  | Neovim highlight group used by artwork rendering.         |
-| `buffer.manager_name`          | `string`  | Name of the main music manager buffer.                    |
-| `buffer.max_width`             | `number`  | Maximum width of the music panel.                         |
-| `buffer.min_width`             | `number`  | Minimum width of the music panel.                         |
-| `buffer.width`                 | `number`  | Preferred width of the music panel.                       |
-| `buffer.cava_name`             | `string`  | Name of the CAVA buffer.                                  |
-| `buffer.cava.max_height`       | `number`  | Maximum height of the CAVA visualizer.                    |
-| `buffer.music.title`           | `string`  | Main title displayed by the music manager.                |
-| `buffer.music.empty_title`     | `string`  | Text shown when no track is playing.                      |
-| `buffer.music.empty_artist`    | `string`  | Fallback text for missing artist metadata.                |
-| `buffer.music.empty_album`     | `string`  | Fallback text for missing album metadata.                 |
-| `buffer.music.padding`         | `number`  | Internal spacing around music elements.                   |
-| `buffer.music.spacing`         | `number`  | Spacing between music interface elements.                 |
-| `buffer.music.controls`        | `table`   | Symbols used for playback controls.                       |
-| `buffer.music.status_icons`    | `table`   | Icons used for playback states.                           |
-| `buffer.music.progress`        | `table`   | Characters used to construct the progress bar.            |
-| `buffer.music.artwork`         | `table`   | Artwork configuration specific to the music panel.        |
-| `buffer.wrap`                  | `boolean` | Enables line wrapping.                                    |
-| `buffer.number`                | `boolean` | Enables absolute line numbers.                            |
-| `buffer.relativenumber`        | `boolean` | Enables relative line numbers.                            |
-| `buffer.cursorline`            | `boolean` | Highlights the current line.                              |
-| `buffer.cursorcolumn`          | `boolean` | Highlights the current column.                            |
-| `buffer.signcolumn`            | `string`  | Controls the Neovim sign column.                          |
-| `buffer.colorcolumn`           | `string`  | Configures Neovim's color column.                         |
-| `buffer.resize`                | `boolean` | Automatically resizes the plugin layout.                  |
-| `buffer.persistent`            | `boolean` | Keeps plugin buffers alive while hidden.                  |
+```bash
+playerctl -p firefox
+```
+
+---
+
+### Menu
+
+Controls the dimensions and lifecycle behavior of the Music Manager interface.
+
+| Option            | Values    | Description                                                                |
+| :---------------- | :-------- | :------------------------------------------------------------------------- |
+| `menu.max_width`  | `integer` | Maximum width allowed for the Music Manager window.                        |
+| `menu.min_width`  | `integer` | Minimum width allowed for the Music Manager window.                        |
+| `menu.width`      | `integer` | Initial or preferred width of the Music Manager window.                    |
+| `menu.resize`     | `boolean` | Automatically resize the interface according to the configured dimensions. |
+| `menu.persistent` | `boolean` | Keep the interface state available when the window is closed and reopened. |
+
+---
+
+### Player
+
+Controls the Music Manager buffer, window appearance, music information, artwork, controls, progress bar, and tracklist.
+
+#### Buffer
+
+| Option             | Values    | Description                                                         |
+| :----------------- | :-------- | :------------------------------------------------------------------ |
+| `player.name`      | `string`  | Name used for the Music Manager buffer.                             |
+| `player.buftype`   | `string`  | Neovim buffer type used by the Music Manager.                       |
+| `player.bufhidden` | `string`  | Determines what happens to the buffer when it is hidden.            |
+| `player.swapfile`  | `boolean` | Enables or disables swapfile creation for the Music Manager buffer. |
+
+#### Background
+
+Controls the background appearance of the Music Manager.
+
+| Option                              | Values         | Description                                                                                                           |
+| :---------------------------------- | :------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `player.background.enabled`         | `boolean`      | Enable or disable the custom background. When `false`, the normal editor background is used.                          |
+| `player.background.darken`          | `number` `0–1` | Amount by which the background is darkened. `0` keeps the original background; `1` produces a fully black background. |
+| `player.background.highlight_group` | `string`       | Name of the highlight group generated internally for the Music Manager background.                                    |
+
+Example:
+
+```lua
+background = {
+    enabled = true,
+    darken = 0.15,
+    highlight_group = "CavaPlayerNormal",
+}
+```
+
+---
+
+#### Window
+
+Controls standard Neovim window options used by the Music Manager.
+
+| Option                         | Values    | Description                      |
+| :----------------------------- | :-------- | :------------------------------- |
+| `player.window.wrap`           | `boolean` | Enable or disable line wrapping. |
+| `player.window.number`         | `boolean` | Show absolute line numbers.      |
+| `player.window.relativenumber` | `boolean` | Show relative line numbers.      |
+| `player.window.cursorline`     | `boolean` | Highlight the current line.      |
+| `player.window.cursorcolumn`   | `boolean` | Highlight the current column.    |
+| `player.window.signcolumn`     | `string`  | Configure the sign column.       |
+| `player.window.colorcolumn`    | `string`  | Configure the color column.      |
+
+---
+
+### Music
+
+Controls the content and visual presentation of the currently playing track.
+
+| Option                      | Values    | Description                                        |
+| :-------------------------- | :-------- | :------------------------------------------------- |
+| `player.music.title`        | `string`  | Title displayed in the Music Manager header.       |
+| `player.music.empty_title`  | `string`  | Placeholder title shown when no music is playing.  |
+| `player.music.empty_artist` | `string`  | Placeholder artist shown when no music is playing. |
+| `player.music.empty_album`  | `string`  | Placeholder album shown when no music is playing.  |
+| `player.music.padding`      | `integer` | Horizontal padding applied to the music content.   |
+| `player.music.spacing`      | `integer` | Vertical spacing between music sections.           |
+
+---
+
+### Music — Title Style
+
+Controls the optional styled title displayed at the top of the Music Manager.
+
+| Option                                     | Values          | Description                                                                         |
+| :----------------------------------------- | :-------------- | :---------------------------------------------------------------------------------- |
+| `player.music.title_style.enabled`         | `boolean`       | Enable or disable the styled title.                                                 |
+| `player.music.title_style.left`            | `string`, `nil` | Character displayed on the left side of the title.                                  |
+| `player.music.title_style.right`           | `string`, `nil` | Character displayed on the right side of the title.                                 |
+| `player.music.title_style.padding`         | `integer`       | Number of spaces between the side characters and title text.                        |
+| `player.music.title_style.highlight_group` | `string`        | Base highlight group used for the title background and foreground.                  |
+| `player.music.title_style.foreground`      | `string`, `nil` | Foreground color. Can be a hexadecimal color or an existing Neovim highlight group. |
+| `player.music.title_style.background`      | `string`, `nil` | Background color. Can be a hexadecimal color or an existing Neovim highlight group. |
+
+Colors can be specified as hexadecimal values:
+
+```lua
+foreground = "#FFFFFF",
+background = "#1E1E2E",
+```
+
+or by referencing an existing Neovim highlight group:
+
+```lua
+foreground = "Normal",
+background = "Visual",
+```
+
+Example:
+
+```lua
+title_style = {
+    enabled = true,
+    left = "",
+    right = "",
+    padding = 1,
+    highlight_group = "CavaPlayerTitle",
+    foreground = nil,
+    background = "Visual",
+}
+```
+
+---
+
+### Music — Controls
+
+Defines the symbols used for playback controls.
+
+| Option                           | Values   | Description                                      |
+| :------------------------------- | :------- | :----------------------------------------------- |
+| `player.music.controls.previous` | `string` | Symbol displayed for the previous-track control. |
+| `player.music.controls.play`     | `string` | Symbol displayed for the play control.           |
+| `player.music.controls.pause`    | `string` | Symbol displayed for the pause control.          |
+| `player.music.controls.next`     | `string` | Symbol displayed for the next-track control.     |
+
+---
+
+### Music — Status Icons
+
+Defines the icon displayed for each playback state.
+
+| Option                              | Values   | Description                                 |
+| :---------------------------------- | :------- | :------------------------------------------ |
+| `player.music.status_icons.Playing` | `string` | Icon displayed while the player is playing. |
+| `player.music.status_icons.Paused`  | `string` | Icon displayed while playback is paused.    |
+| `player.music.status_icons.Stopped` | `string` | Icon displayed when playback is stopped.    |
+
+---
+
+### Music — Progress
+
+Controls the playback progress bar.
+
+| Option                         | Values   | Description                                                   |
+| :----------------------------- | :------- | :------------------------------------------------------------ |
+| `player.music.progress.filled` | `string` | Character used for the completed portion of the progress bar. |
+| `player.music.progress.empty`  | `string` | Character used for the remaining portion.                     |
+| `player.music.progress.left`   | `string` | Character displayed at the beginning of the progress bar.     |
+| `player.music.progress.right`  | `string` | Character displayed at the end of the progress bar.           |
+
+Example:
+
+```lua
+progress = {
+    filled = "●",
+    empty = "·",
+    left = "",
+    right = "",
+}
+```
+
+---
+
+### Music — Artwork
+
+Controls the main album artwork displayed for the currently playing track.
+
+| Option                             | Values    | Description                                 |
+| :--------------------------------- | :-------- | :------------------------------------------ |
+| `player.music.artwork.enabled`     | `boolean` | Enable or disable album artwork.            |
+| `player.music.artwork.placeholder` | `string`  | Character used when artwork is unavailable. |
+| `player.music.artwork.highlight`   | `string`  | Highlight group used for rendered artwork.  |
+| `player.music.artwork.max_width`   | `integer` | Maximum artwork width.                      |
+| `player.music.artwork.max_height`  | `integer` | Maximum artwork height.                     |
+
+---
+
+### Music — Tracklist
+
+Controls the playlist/tracklist displayed below the current track information.
+
+| Option                                      | Values                 | Description                                                          |
+| :------------------------------------------ | :--------------------- | :------------------------------------------------------------------- |
+| `player.music.tracklist.enabled`            | `boolean`              | Enable or disable the tracklist.                                     |
+| `player.music.tracklist.view_mode`          | `"full"`, `"upcoming"` | Determines whether all tracks or only upcoming tracks are displayed. |
+| `player.music.tracklist.spacing`            | `integer`              | Vertical spacing around the tracklist.                               |
+| `player.music.tracklist.item_spacing`       | `integer`              | Spacing between individual tracklist items.                          |
+| `player.music.tracklist.thumbnail_width`    | `integer`              | Width of track thumbnails.                                           |
+| `player.music.tracklist.thumbnail_height`   | `integer`              | Height of track thumbnails.                                          |
+| `player.music.tracklist.thumbnail_gap`      | `integer`              | Space between the thumbnail and track information.                   |
+| `player.music.tracklist.duration_gap`       | `integer`              | Space between track metadata and duration.                           |
+| `player.music.tracklist.placeholder`        | `string`               | Character used to draw thumbnail placeholders.                       |
+| `player.music.tracklist.selected`           | `string`               | Symbol used to indicate the selected/current track.                  |
+| `player.music.tracklist.selected_highlight` | `string`               | Highlight group used for the selected track.                         |
+| `player.music.tracklist.title_highlight`    | `string`               | Highlight group used for track titles.                               |
+| `player.music.tracklist.metadata_highlight` | `string`               | Highlight group used for artist/album metadata.                      |
+| `player.music.tracklist.duration_highlight` | `string`               | Highlight group used for track durations.                            |
+
+#### Tracklist View Modes
+
+| Value        | Description                                    |
+| :----------- | :--------------------------------------------- |
+| `"full"`     | Display the complete available tracklist.      |
+| `"upcoming"` | Display the current track and upcoming tracks. |
+
+---
+
+### Music — Tracklist Artwork
+
+Controls the thumbnails displayed next to tracklist entries.
+
+| Option                                   | Values                     | Description                                            |
+| :--------------------------------------- | :------------------------- | :----------------------------------------------------- |
+| `player.music.tracklist.artwork.enabled` | `boolean`                  | Enable or disable artwork thumbnails in the tracklist. |
+| `player.music.tracklist.artwork.source`  | `"chafa"`, `"placeholder"` | Determines how tracklist thumbnails are rendered.      |
+
+#### Artwork Sources
+
+| Value           | Description                                                                                  |
+| :-------------- | :------------------------------------------------------------------------------------------- |
+| `"image"`       | Render cached artwork using Chafa. If artwork is unavailable, a generic placeholder is used. |
+| `"placeholder"` | Always use the configured generic thumbnail placeholder.                                     |
+
+When `enabled = false`, the tracklist displays only textual information and does not reserve space for thumbnails.
+
+Example:
+
+```lua
+artwork = {
+    enabled = true,
+    source = "chafa",
+}
+```
+
+---
+
+### Music — Empty Tracklist Placeholder
+
+Controls the placeholder displayed while tracklist information is unavailable.
+
+| Option                                                   | Values    | Description                                        |
+| :------------------------------------------------------- | :-------- | :------------------------------------------------- |
+| `player.music.tracklist.empty_placeholder.enabled`       | `boolean` | Enable or disable the empty-tracklist placeholder. |
+| `player.music.tracklist.empty_placeholder.items`         | `integer` | Number of placeholder entries displayed.           |
+| `player.music.tracklist.empty_placeholder.title`         | `string`  | Main placeholder title.                            |
+| `player.music.tracklist.empty_placeholder.artist`        | `string`  | Placeholder description or artist text.            |
+| `player.music.tracklist.empty_placeholder.fake_title`    | `string`  | Character/string used to simulate a track title.   |
+| `player.music.tracklist.empty_placeholder.fake_metadata` | `string`  | Character/string used to simulate track metadata.  |
+| `player.music.tracklist.empty_placeholder.fake_duration` | `string`  | Placeholder duration displayed for fake entries.   |
+
+---
+
+### CAVA
+
+Controls the optional real-time audio visualizer.
+
+| Option                      | Values    | Description                                                                                            |
+| :-------------------------- | :-------- | :----------------------------------------------------------------------------------------------------- |
+| `cava.enabled`              | `boolean` | Enable or disable CAVA integration. CAVA is optional and is only required when this option is enabled. |
+| `cava.fps`                  | `integer` | Target number of visualization frames per second.                                                      |
+| `cava.delay_ms`             | `integer` | Delay applied between visualization requests/updates.                                                  |
+| `cava.max_inflight`         | `integer` | Maximum number of visualization requests allowed to be in flight simultaneously.                       |
+| `cava.min_request_interval` | `integer` | Minimum interval between visualization requests in milliseconds.                                       |
+| `cava.max_buffered_frames`  | `integer` | Maximum number of frames retained in the client buffer.                                                |
+| `cava.debug`                | `boolean` | Enable additional CAVA debugging information.                                                          |
+| `cava.max_height`           | `integer` | Maximum height available to the CAVA visualization.                                                    |
+
+#### CAVA Background
+
+| Option                            | Values         | Description                                                   |
+| :-------------------------------- | :------------- | :------------------------------------------------------------ |
+| `cava.background.enabled`         | `boolean`      | Enable or disable the custom CAVA background.                 |
+| `cava.background.darken`          | `number` `0–1` | Amount by which the background is darkened.                   |
+| `cava.background.highlight_group` | `string`       | Highlight group generated internally for the CAVA background. |
+
+> CAVA itself is optional. The plugin can be used as a music player without installing or enabling the visualizer.
+
+---
+
+### Poller
+
+Controls how frequently `cava.nvim` synchronizes information with the Python backend.
+
+| Option                   | Values    | Description                                                                                 |
+| :----------------------- | :-------- | :------------------------------------------------------------------------------------------ |
+| `poller.player_interval` | `integer` | Interval between normal player synchronization requests, in milliseconds.                   |
+| `poller.retry_interval`  | `integer` | Interval used when retrying after a failed or unavailable backend request, in milliseconds. |
+
+---
+
+### Configuration Summary
+
+| Section  | Purpose                                                              |
+| :------- | :------------------------------------------------------------------- |
+| `server` | Python HTTP server and media providers.                              |
+| `menu`   | Music Manager dimensions and lifecycle.                              |
+| `player` | Buffer, window, music information, controls, artwork, and tracklist. |
+| `cava`   | Real-time audio visualization.                                       |
+| `poller` | Backend synchronization intervals.                                   |
 
 ## Commands
 
-### Interface
+`cava.nvim` provides a set of commands for managing the music interface, controlling playback, adjusting playback settings, and selecting media providers.
 
-| Command       | Description                          |
-| ------------- | ------------------------------------ |
-| `:CavaOpen`   | Opens the Music Manager interface.   |
-| `:CavaClose`  | Closes the Music Manager interface.  |
-| `:CavaToggle` | Toggles the Music Manager interface. |
+### Command Reference
 
-### Playback
+| Category      | Command                 | Arguments              | Description                                       |
+| :------------ | :---------------------- | :--------------------- | :------------------------------------------------ |
+| **Interface** | `:CavaOpen`             | —                      | Open the Music Manager interface.                 |
+|               | `:CavaClose`            | —                      | Close the Music Manager interface.                |
+|               | `:CavaToggle`           | —                      | Toggle the Music Manager interface.               |
+| **Playback**  | `:CavaPlay`             | —                      | Start playback.                                   |
+|               | `:CavaPause`            | —                      | Pause playback.                                   |
+|               | `:CavaPlayPause`        | —                      | Toggle between playing and paused states.         |
+|               | `:CavaStop`             | —                      | Stop playback.                                    |
+|               | `:CavaNext`             | —                      | Play the next track.                              |
+|               | `:CavaPrevious`         | —                      | Play the previous track.                          |
+| **Seek**      | `:CavaSeek`             | `<seconds>`            | Seek relative to the current playback position.   |
+|               | `:CavaSeekForward`      | `<seconds>`            | Seek forward by the specified number of seconds.  |
+|               | `:CavaSeekBackward`     | `<seconds>`            | Seek backward by the specified number of seconds. |
+|               | `:CavaPosition`         | `<seconds>`            | Set the absolute playback position.               |
+| **Volume**    | `:CavaVolume`           | `<value>`              | Set the playback volume.                          |
+|               | `:CavaVolumeUp`         | `[amount]`             | Increase the playback volume.                     |
+|               | `:CavaVolumeDown`       | `[amount]`             | Decrease the playback volume.                     |
+| **Shuffle**   | `:CavaShuffle`          | `on\|off`              | Enable or disable shuffle mode.                   |
+|               | `:CavaShuffleToggle`    | —                      | Toggle shuffle mode.                              |
+| **Loop**      | `:CavaLoop`             | `off\|track\|playlist` | Set the playback loop mode.                       |
+|               | `:CavaLoopToggle`       | —                      | Cycle through the available loop modes.           |
+| **Provider**  | `:CavaProvider`         | `<provider>`           | Select a specific media provider.                 |
+|               | `:CavaProviderAuto`     | —                      | Automatically select the configured provider.     |
+|               | `:CavaProviderNext`     | —                      | Select the next available provider.               |
+|               | `:CavaProviderPrevious` | —                      | Select the previous available provider.           |
 
-| Command          | Description                                  |
-| ---------------- | -------------------------------------------- |
-| `:CavaPlay`      | Starts playback.                             |
-| `:CavaPause`     | Pauses playback.                             |
-| `:CavaPlayPause` | Toggles playback between playing and paused. |
-| `:CavaNext`      | Plays the next track.                        |
-| `:CavaPrevious`  | Plays the previous track.                    |
+### Arguments
 
-The playback commands communicate with the backend asynchronously, so they do not intentionally block Neovim while waiting for the server response.
+Command arguments follow these conventions:
 
-## How It Works
+| Syntax       | Description            |
+| :----------- | :--------------------- |
+| `<argument>` | Required argument.     |
+| `[argument]` | Optional argument.     |
+| `—`          | No arguments required. |
 
-The plugin is composed of several independent components:
+### Examples
+
+```vim
+" Playback
+:CavaPlay
+:CavaPause
+:CavaNext
+:CavaPrevious
+
+" Seek
+:CavaSeek 10
+:CavaSeekForward 30
+:CavaSeekBackward 15
+:CavaPosition 120
+
+" Volume
+:CavaVolume 0.5
+:CavaVolumeUp
+:CavaVolumeDown 0.05
+
+" Shuffle
+:CavaShuffle on
+:CavaShuffleToggle
+
+" Loop
+:CavaLoop track
+:CavaLoop playlist
+:CavaLoopToggle
+
+" Providers
+:CavaProvider YoutubeMusic
+:CavaProvider firefox
+:CavaProviderAuto
+```
+
+### Provider Selection
+
+The provider commands allow `cava.nvim` to switch between available media sources.
+
+For example:
+
+```vim
+:CavaProvider YoutubeMusic
+```
+
+can select the configured YouTube Music source, while:
+
+```vim
+:CavaProvider firefox
+```
+
+can select a generic MPRIS player exposed through Playerctl.
+
+Available Playerctl providers can be listed with:
+
+```bash
+playerctl -l
+```
+
+The provider name must match the player exposed by the configured backend.
+
+### Asynchronous Commands
+
+Playback, seeking, volume, shuffle, loop, and provider commands communicate with the Python backend asynchronously.
+
+This keeps command execution independent from Neovim's main UI loop and prevents media operations from intentionally blocking the editor.
+
+## Architecture
+
+`cava.nvim` separates the user interface from the media and visualization backend.
 
 ```text
                          Neovim
                             │
                             ▼
-                     ┌─────────────┐
-                     │  cava.nvim  │
-                     └──────┬──────┘
+                    ┌────────────────┐
+                    │   cava.nvim    │
+                    │   UI / State   │
+                    └───────┬────────┘
                             │
-                    HTTP / JSON API
+                       HTTP / JSON
                             │
                             ▼
-                     ┌─────────────┐
-                     │ Python      │
-                     │ Backend     │
-                     └──────┬──────┘
+                    ┌────────────────┐
+                    │ Python Backend │
+                    └───────┬────────┘
                             │
               ┌─────────────┼─────────────┐
               │             │             │
               ▼             ▼             ▼
-         ┌─────────┐   ┌──────────┐   ┌─────────┐
-         │ CAVA    │   │ Playerctl│   │ Chafa   │
-         └────┬────┘   └─────┬────┘   └────┬────┘
-              │              │             │
-              │              │             │
-              ▼              ▼             ▼
-          Audio data     Music data    Image output
-                             │
-                             ▼
-                         Artwork
+       ┌────────────┐ ┌────────────┐ ┌────────────┐
+       │ Pear       │ │ Playerctl  │ │    CAVA    │
+       │ Desktop API│ │   / MPRIS  │ │            │
+       └────────────┘ └────────────┘ └────────────┘
+              │             │
+              └──────┬──────┘
+                     ▼
+               Music metadata
+                     │
+                     ▼
+                  Artwork
+                     │
+                     ▼
+                  Chafa
+                     │
+                     ▼
+              Terminal rendering
 ```
 
-### CAVA
+### Provider Architecture
 
-CAVA analyzes the system audio and continuously produces frequency information.
+The media system is designed around providers.
 
-The backend reads these frames and exposes them through the local HTTP API.
+For YouTube Music:
 
-Neovim periodically retrieves the latest frame and updates the visualizer buffer.
+```text
+cava.nvim
+    │
+    ▼
+Music Orchestrator
+    │
+    ▼
+YouTube Music Provider
+    │
+    ▼
+Pear Desktop API
+```
 
-### Playerctl
+For generic media players:
 
-Playerctl communicates with the media player through MPRIS.
+```text
+cava.nvim
+    │
+    ▼
+Music Orchestrator
+    │
+    ▼
+Playerctl Provider
+    │
+    ▼
+playerctl -p <provider>
+    │
+    ▼
+MPRIS
+    │
+    ▼
+Media Player
+```
 
-The plugin can retrieve metadata such as:
+This allows the UI to remain independent from the media application being used.
 
-- Title
-- Artist
-- Album
-- Playback status
-- Current position
-- Duration
-- Artwork URL
+## Artwork Pipeline
 
-It can also send playback commands.
+Artwork follows an asynchronous pipeline:
 
-### Artwork
+```text
+Media Provider
+      │
+      ▼
+ Artwork URL
+      │
+      ▼
+Python Backend
+      │
+      ▼
+ Local Cache
+      │
+      ▼
+ Chafa
+      │
+      ▼
+ANSI / Unicode output
+      │
+      ▼
+Neovim Buffer
+```
 
-When the current track provides an artwork URL, the backend downloads the image asynchronously.
+Tracklist thumbnails use the same rendering mechanism.
 
-The image is stored in a local cache so that it does not need to be downloaded repeatedly.
+If a track provides artwork, the image is retrieved and rendered through Chafa.
 
-When a new track starts, the artwork cache is checked and the new image is rendered when available.
+If artwork is unavailable, the configured placeholder is used.
 
-### Chafa
+## CAVA Pipeline
 
-Chafa converts the local artwork image into terminal-compatible output.
+When CAVA is enabled:
 
-This allows album artwork to be displayed even in terminals without native image protocols.
+```text
+System Audio
+     │
+     ▼
+   CAVA
+     │
+     ▼
+Raw frequency frames
+     │
+     ▼
+Python Backend
+     │
+     ▼
+HTTP API
+     │
+     ▼
+Neovim
+     │
+     ▼
+CAVA Buffer
+```
 
-## Current Limitations
+CAVA is completely optional.
 
-This is the **first version** of `cava.nvim`, so there are still several areas that need improvement.
+When:
 
-Some parts of the plugin have only been tested in a limited environment.
+```lua
+cava = {
+    enabled = false,
+}
+```
 
-In particular:
+the CAVA process is not started and the visualizer is disabled.
 
-- The primary tested media source is YouTube Music through Pear Desktop.
-- Other MPRIS-compatible players have not been tested extensively yet.
-- Terminal image rendering currently relies on Chafa.
-- Native terminal image protocols are not implemented yet.
-- The UI is still evolving.
-- Some configuration options may change as the architecture stabilizes.
-- More extensive testing across terminals, operating systems, and media players is still needed.
+## Current Status
+
+`cava.nvim` is now in its **first formal release**.
+
+The project has moved beyond its initial experimental stage and provides a structured media backend, configurable Neovim interface, native Pear Desktop integration, generic Playerctl support, artwork rendering, tracklists, track thumbnails, and an optional CAVA visualizer.
+
+The current release is:
+
+```text
+v0.1.0
+```
 
 ## Roadmap
 
 ### Media Sources
 
-- [ ] Test and support additional MPRIS-compatible media players.
-- [ ] Improve player detection.
-- [ ] Improve handling of multiple simultaneously available players.
-- [ ] Provide better automatic player selection.
+- [ ] Expand native integrations for additional music applications.
+- [ ] Improve automatic provider detection.
+- [ ] Improve handling of multiple simultaneously available media players.
+- [ ] Expand tracklist support across more providers.
+- [ ] Improve provider-specific metadata.
 
-### Image Rendering
+### Artwork
 
-- [ ] Support native terminal image protocols where available.
-- [ ] Detect terminals capable of displaying real images.
-- [ ] Render actual images instead of relying exclusively on ANSI/symbol rendering.
-- [ ] Provide different rendering backends depending on terminal capabilities.
+- [ ] Support additional terminal image protocols.
+- [ ] Detect terminals capable of native image rendering.
+- [ ] Add alternative artwork rendering backends.
+- [ ] Improve artwork transitions.
+- [ ] Improve thumbnail rendering.
 
 ### User Interface
 
-- [ ] Improve the visual layout.
-- [ ] Improve artwork transitions.
+- [ ] Improve responsive layouts.
+- [ ] Add additional visual themes.
 - [ ] Add more customization options.
-- [ ] Improve responsive behavior when the Neovim window is resized.
+- [ ] Improve mouse interaction.
+- [ ] Improve tracklist interaction.
 
-### Interaction
+### Integration
 
-- [ ] Add mouse/touch-oriented controls where supported.
-- [ ] Improve interaction with the music controls.
-- [ ] Explore touch input support for compatible terminal environments.
-
-### Alpha.nvim
-
-- [ ] Add integration with **alpha-nvim**.
-- [ ] Explore displaying the current music state and visualizer inside the Neovim start screen.
-- [ ] Provide optional music widgets for Alpha.
-
-## Why the Project Exists
-
-`cava.nvim` started as a personal experiment.
-
-I spend a significant amount of time inside Neovim, and I wanted to be able to see what I was listening to without constantly switching between Neovim and my music player.
-
-The initial idea was simply to create a small music monitor inside Neovim.
-
-From there, the project evolved into a combination of:
-
-- Music metadata.
-- Playback controls.
-- Album artwork.
-- Audio visualization.
-- A Python backend.
-- Terminal image rendering.
-- A configurable Neovim interface.
-
-The project is still evolving, but the long-term goal is to make Neovim capable of acting as a small, extensible music dashboard.
+- [ ] Add integration with Alpha.nvim.
+- [ ] Provide optional music widgets for Alpha.nvim.
+- [ ] Explore additional Neovim UI integrations.
 
 ## Contributing
 
-Contributions, bug reports, feature requests, and pull requests are welcome!
+Contributions, bug reports, feature requests, and pull requests are welcome.
 
-Since this project is still in its early stages, feedback is especially useful.
+Testing with different:
 
-If you use a different media player, terminal, operating system, or terminal image protocol, testing and reporting compatibility would be greatly appreciated.
+- Media players.
+- Linux distributions.
+- Terminals.
+- Terminal emulators.
+- Colorschemes.
+- MPRIS implementations.
 
-Feel free to open an issue or submit a pull request on GitHub.
+is especially useful for improving compatibility.
+
+If you encounter a problem, please include:
+
+- Neovim version.
+- Operating system.
+- Terminal emulator.
+- Python version.
+- Playerctl version, if used.
+- Chafa version.
+- CAVA version, if enabled.
+- Media player being used.
+- Relevant `cava.nvim` configuration.
 
 ## License
 
@@ -636,3 +1242,15 @@ This project is open-source software licensed under the [MIT](./LICENSE) license
     <img alt="LinkedIn" src="https://img.shields.io/badge/linkedin-%230077B5.svg?&style=for-the-badge&logo=linkedin&logoColor=white" />
   </a>
 </p>
+```
+
+Hay una cosa que **sí corregiría antes de subir este README**: en tu nueva configuración tienes `tracklist.artwork.source = "image"`, mientras que el método que acabamos de modificar interpreta cualquier valor distinto de `"placeholder"` como Chafa, así que funciona. Sin embargo, para que la API sea más explícita, yo estandarizaría ese nombre como `"chafa"`:
+
+```lua
+artwork = {
+    enabled = true,
+    source = "chafa",
+}
+```
+
+Eso hace que la documentación diga exactamente qué backend está usando y evita que `"image"` pueda confundirse posteriormente con soporte nativo de imágenes del terminal.

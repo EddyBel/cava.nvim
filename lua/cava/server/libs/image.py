@@ -585,25 +585,109 @@ class Image:
 
         return value
 
+        # ========================================================================
+    # SQUARE CROP
+    # ========================================================================
+    def calculate_square_crop(self):
+        """
+        Calculate a centered square crop of the original image.
+
+        Does not read or modify pixel data: this only computes the crop
+        box from the dimensions already extracted by `inspect()`. Actual
+        pixel cropping (if needed) must be performed by whatever external
+        tool consumes this box (e.g. a `convert`/`ffmpeg` subprocess) —
+        this class intentionally stays a pure metadata/no-dependency
+        module and never decodes image content.
+
+        The square uses `min(width, height)` as its side, so it always
+        fits entirely inside the original image, and is centered on
+        whichever axis is longer:
+
+            landscape (width > height):
+                x = (width - side) / 2
+                y = 0
+
+            portrait (height > width):
+                x = 0
+                y = (height - side) / 2
+
+            already square:
+                x = 0
+                y = 0
+
+        Example:
+            image:
+                1920 x 1080
+
+        Result:
+            {
+                "x": 420,
+                "y": 0,
+                "width": 1080,
+                "height": 1080,
+            }
+        """
+        dimensions = (
+            self.get_dimensions()
+        )
+        width = dimensions["width"]
+        height = dimensions["height"]
+        side = min(
+            width,
+            height,
+        )
+        x = (
+            width
+            - side
+        ) // 2
+        y = (
+            height
+            - side
+        ) // 2
+        return {
+            "x": x,
+            "y": y,
+            "width": side,
+            "height": side,
+        }
+
     # ========================================================================
     # SIZE
     # ========================================================================
 
+        # ========================================================================
+    # SIZE
+    # ========================================================================
     def calculate_size(
         self,
         size,
         font_ratio="1/2",
+        square=False,
     ):
         """
         Calculate the largest terminal size that fits
         inside the requested dimensions while preserving
-        the image aspect ratio.
+        an aspect ratio.
 
         The terminal character aspect ratio is taken into
         account.
 
-        Example:
+        Parameters
+        ----------
+        size : dict
+            Maximum terminal size, e.g. {"width": 40, "height": 20}.
+        font_ratio : str | float
+            Terminal character aspect ratio (width / height).
+        square : bool
+            If `True`, the calculation ignores the image's original
+            aspect ratio and treats it as 1:1 instead — matching a
+            centered square crop obtained via `calculate_square_crop()`.
+            Use this when the rendered image will actually be cropped to
+            a square beforehand (e.g. before feeding it to Chafa), so
+            the terminal size fits the CROPPED shape, not the original
+            rectangular one.
 
+        Example:
             image:
                 1920 x 1080
 
@@ -613,8 +697,7 @@ class Image:
             font ratio:
                 1/2
 
-        Result:
-
+        Result (square=False):
             {
                 "width": 40,
                 "height": 11,
@@ -622,8 +705,16 @@ class Image:
                 "target_ratio": 3.555...,
                 "font_ratio": 0.5
             }
-        """
 
+        Result (square=True):
+            {
+                "width": 20,
+                "height": 10,
+                "aspect_ratio": 1.0,
+                "target_ratio": 2.0,
+                "font_ratio": 0.5
+            }
+        """
         if not isinstance(
             size,
             dict,
@@ -631,26 +722,21 @@ class Image:
             raise ValueError(
                 "Invalid size"
             )
-
         try:
             max_width = int(
                 size["width"]
             )
-
             max_height = int(
                 size["height"]
             )
-
         except (
             KeyError,
             TypeError,
             ValueError,
         ) as error:
-
             raise ValueError(
                 "Invalid image size"
             ) from error
-
         if (
             max_width <= 0
             or max_height <= 0
@@ -658,17 +744,16 @@ class Image:
             raise ValueError(
                 "Image size must be greater than zero"
             )
-
         image_ratio = (
-            self.get_aspect_ratio()
+            1.0
+            if square
+            else self.get_aspect_ratio()
         )
-
         cell_ratio = (
             self._parse_font_ratio(
                 font_ratio
             )
         )
-
         # Ratio represented by the terminal grid.
         #
         #     columns
@@ -677,30 +762,24 @@ class Image:
         #
         # must compensate for the physical aspect ratio
         # of terminal characters.
-
         target_ratio = (
             image_ratio
             / cell_ratio
         )
-
         # Candidate constrained by width.
         width = max_width
-
         height = (
             width
             / target_ratio
         )
-
         # If the resulting height is too large,
         # constrain the image by height instead.
-
         if height > max_height:
             height = max_height
             width = (
                 height
                 * target_ratio
             )
-
         width = max(
             1,
             min(
@@ -708,7 +787,6 @@ class Image:
                 int(width),
             ),
         )
-
         height = max(
             1,
             min(
@@ -716,7 +794,6 @@ class Image:
                 int(height),
             ),
         )
-
         return {
             "width": width,
             "height": height,
